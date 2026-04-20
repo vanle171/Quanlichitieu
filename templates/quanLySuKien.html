@@ -1,0 +1,597 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý các sự kiện dự kiến{% endblock %}
+
+{% block extra_css %}
+    <style>
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .btn-add {
+            background: #000;
+            color: #fff;
+        }
+
+        .btn-save {
+            background: #000;
+            color: #fff;
+            width: 100%;
+            margin-top: 15px;
+            border-radius: 4px;
+            padding: 12px;
+        }
+
+        .btn-save:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-close-text {
+            background: none;
+            color: #666;
+            margin-top: 10px;
+            width: 100%;
+            text-decoration: underline;
+            border: none;
+            cursor: pointer;
+        }
+
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background: #fafafa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .clickable-row {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .clickable-row:hover {
+            background: #f9fafb;
+        }
+
+        .tag {
+            background: #eee;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-right: 5px;
+            color: #555;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            width: 450px;
+            padding: 30px;
+            border-radius: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        #budget-error {
+            color: #ff4d4d;
+            font-size: 12px;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+
+        tfoot td {
+            background: #fafafa;
+            font-weight: bold;
+            border-top: 2px solid #eee;
+        }
+
+    </style>
+{% endblock %}
+
+{% block content %}
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; width: 100%;">
+        <h1>Quản lý kế hoạch</h1>
+        <button class="btn btn-add" onclick="openAddModal()">+ Thêm kế hoạch</button>
+    </header>
+
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 50px; text-align: center;">STT</th>
+                <th>Tên kế hoạch</th>
+                <th>Ngày bắt đầu</th>
+                <th>Ngày kết thúc</th>
+                <th>Năm</th>
+                <th style="text-align: right;">Người</th>
+                <th style="text-align: center;">Số lượng sự kiện</th>
+                <th style="text-align: right;">Tổng tiền</th>
+                <th style="text-align: center;">Hành động</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item_wrapper in events_with_children %}
+                {% with item=item_wrapper.event %}
+                <tr class="clickable-row"
+                    onclick="openEditModal('{{ item.id }}', '{{ item.title|escapejs }}', '{{ item.fromDate|date:'Y-m-d' }}', '{{ item.toDate|date:'Y-m-d' }}', [{% for cat in item.categories.all %}'{{ cat.id }}'{% if not forloop.last %},{% endif %}{% endfor %}], '{{ item.totalUserAllocated }}', '{{ item.totalAmount }}', '{{ item.year }}', '{{ item.so_luong_su_kien_con }}')">
+                    <td style="text-align: center; color: #999;">{{ forloop.counter }}</td>
+                    <td><strong>{{ item.title }}</strong></td>
+                    <td>{{ item.fromDate|date:"d/m/Y" }}</td>
+                    <td>{{ item.toDate|date:"d/m/Y" }}</td>
+                    <td><strong>{{ item.year }}</strong></td>
+                    <td style="text-align: right;">{{ item.totalUserAllocated|default:"0" }}</td>
+                    <td style="text-align: center;">{{ item_wrapper.children|length }} / {{ item.so_luong_su_kien_con }}</td>
+                    <td style="text-align: right; font-weight: bold;">
+                        <script>document.write(Number('{{ item.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
+                        đ
+                    </td>
+                    <td style="text-align: center;">
+                        <button type="button" class="btn btn-add" onclick="event.stopPropagation(); openChildEventModal('{{ item.id }}', '{{ item.title|escapejs }}', '{{ item.fromDate|date:'Y-m-d' }}', '{{ item.toDate|date:'Y-m-d' }}', '{{ item.so_luong_su_kien_con }}', '{{ item_wrapper.children|length }}')" {% if item_wrapper.children|length >= item.so_luong_su_kien_con %}disabled style="opacity:0.6; cursor:not-allowed;"{% endif %}>
+                            Thêm sự kiện
+                        </button>
+                    </td>
+                </tr>
+
+                {% for child in item_wrapper.children %}
+                <tr style="background-color: #f9fafb; border-left: 4px solid #007bff;">
+                    <td style="text-align: center; color: #999;"></td>
+                    <td style="padding-left: 40px;">
+                        <span style="color: #007bff; font-size: 12px; font-weight: bold; margin-right: 8px;">└─</span>
+                        {{ child.title }}
+                    </td>
+                    <td>{{ child.fromDate|date:"d/m/Y" }}</td>
+                    <td>{{ child.toDate|date:"d/m/Y" }}</td>
+                    <td></td>
+                    <td style="text-align: right;">{{ child.totalUserAllocated|default:"0" }}</td>
+                    <td></td>
+                    <td style="text-align: right; font-weight: bold;">
+                        <script>document.write(Number('{{ child.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
+                        đ
+                    </td>
+                    <td style="text-align: center;">
+                        <button type="button" class="btn btn-add" onclick="event.stopPropagation(); openEditChildEventModal('{{ child.id }}', '{{ child.title|escapejs }}', '{{ child.fromDate|date:'Y-m-d' }}', '{{ child.toDate|date:'Y-m-d' }}', '{{ item.id }}')" style="background: #007bff; padding: 5px 10px; font-size: 12px;">
+                            Sửa
+                        </button>
+                        <button type="button" class="btn btn-add" onclick="event.stopPropagation(); deleteChildEvent('{{ child.id }}')" style="background: #ff4d4d; padding: 5px 10px; font-size: 12px; margin-left: 5px;">
+                            Xóa
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endwith %}
+            {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: #999; padding: 40px;">Chưa có dữ liệu nào.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+
+            <tfoot>
+            <tr>
+                <td colspan="7" style="text-align: right; padding: 15px 20px;">Tổng ngân sách cấp trong năm:</td>
+                <td style="text-align: right; padding: 15px 20px; font-size: 15px; color: #000;" colspan="2">
+                    <span id="display_budget_year"></span> đ
+                </td>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div class="modal-overlay" id="modalEvent">
+        <div class="modal-content">
+            <h3 id="modalTitle" style="margin-bottom: 20px;">Thêm kế hoạch</h3>
+            <form action="{% url 'quanLySuKien' %}" method="POST" id="mainForm">
+                {% csrf_token %}
+                <input type="hidden" id="hidden_per_user_amount" value="{{ per_user_amount|default:0 }}">
+                <input type="hidden" id="hidden_total_year_budget" value="{{ totalAmountYear|default:0 }}">
+                <input type="hidden" name="event_id" id="edit_id">
+
+                <div class="form-group">
+                    <label>Tên kế hoạch</label>
+                    <input type="text" name="title" id="edit_title" required>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Ngày bắt đầu</label>
+                        <input type="date" name="fromDate" id="edit_fromDate" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Ngày kết thúc</label>
+                        <input type="date" name="toDate" id="edit_toDate" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Năm</label>
+                    <input type="number" name="year" id="edit_year" required
+                           onchange="loadCategoriesByYear(this.value)">
+                </div>
+
+                <div class="form-group">
+                    <label>Số lượng sự kiện</label>
+                    <input type="number" name="so_luong_su_kien_con" id="edit_child_count" value="0" min="0" required>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Số người</label>
+                        <input type="number" name="totalUserAllocated" id="edit_users" value="0" min="0"
+                               oninput="calculateTotal()">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Tổng tiền (Tự động tính)</label>
+                        <input type="text" name="totalAmount" id="edit_amount" readonly
+                               style="background: #f5f5f5; cursor: default;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Tiêu Chí (Chọn thêm)</label>
+                    <select name="danh_muc" id="edit_categories" multiple style="height: 100px;"
+                            onchange="calculateTotal()">
+                        {% for cat in all_categories %}
+                            <option value="{{ cat.id }}" data-amount="{{ cat.amount }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div id="budget-error">⚠️ Vượt quá tổng ngân sách cấp trong năm!</div>
+
+                <button type="submit" class="btn btn-save" id="btnSave">Lưu lại</button>
+                <button type="button" id="btnDelete" class="btn"
+                        style="color: #fff; width: 100%; margin-top: 15px; border-radius: 4px; padding: 12px; background: #ff4d4d; display: none;"
+                        onclick="confirmDelete()">Xóa
+                </button>
+                <button type="button" class="btn btn-close-text" onclick="closeModal()">Hủy bỏ</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalChildEvent">
+        <div class="modal-content">
+            <h3 id="childModalTitle" style="margin-bottom: 20px;">Thêm sự kiện con</h3>
+            <form action="{% url 'quanLySuKien' %}" method="POST" id="childForm">
+                {% csrf_token %}
+                <input type="hidden" name="is_child_mode" value="1">
+                <input type="hidden" name="parent_event_id" id="child_parent_event_id">
+
+                <div class="form-group">
+                    <label>Tên sự kiện con</label>
+                    <input type="text" name="title" id="child_title" required>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Ngày bắt đầu</label>
+                        <input type="date" name="fromDate" id="child_fromDate" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Ngày kết thúc</label>
+                        <input type="date" name="toDate" id="child_toDate" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Ghi chú</label>
+                    <input type="text" id="child_note" readonly style="background: #f5f5f5; cursor: default;">
+                </div>
+
+                <button type="submit" class="btn btn-save">Lưu lại</button>
+                <button type="button" class="btn btn-close-text" onclick="closeChildModal()">Hủy bỏ</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalEditChildEvent">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px;">Sửa sự kiện con</h3>
+            <form action="{% url 'quanLySuKien' %}" method="POST" id="editChildForm">
+                {% csrf_token %}
+                <input type="hidden" name="is_child_mode" value="1">
+                <input type="hidden" name="event_id" id="edit_child_event_id">
+                <input type="hidden" name="parent_event_id" id="edit_child_parent_event_id">
+
+                <div class="form-group">
+                    <label>Tên sự kiện con</label>
+                    <input type="text" name="title" id="edit_child_title" required>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Ngày bắt đầu</label>
+                        <input type="date" name="fromDate" id="edit_child_fromDate" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Ngày kết thúc</label>
+                        <input type="date" name="toDate" id="edit_child_toDate" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Ghi chú</label>
+                    <input type="text" id="edit_child_note" readonly style="background: #f5f5f5; cursor: default;">
+                </div>
+
+                <button type="submit" class="btn btn-save">Cập nhật</button>
+                <button type="button" class="btn btn-close-text" onclick="closeEditChildModal()">Hủy bỏ</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        const modal = document.getElementById('modalEvent');
+        const budgetYear = parseFloat(document.getElementById('hidden_total_year_budget').value) || 0;
+        document.getElementById('display_budget_year').innerText = budgetYear.toLocaleString('vi-VN');
+
+        function openAddModal() {
+            document.getElementById('modalTitle').innerText = "Thêm kế hoạch";
+            document.getElementById('edit_id').value = "";
+            document.getElementById('mainForm').reset();
+            document.getElementById('btnDelete').style.display = 'none';
+            document.getElementById('budget-error').style.display = 'none';
+            document.getElementById('btnSave').disabled = false;
+            const y = new Date().getFullYear();
+            document.getElementById('edit_year').value = y;
+            document.getElementById('edit_child_count').value = 0;
+            loadCategoriesByYear(y);
+            modal.classList.add('active');
+        }
+
+        function openEditModal(id, title, fromDate, toDate, categoryIds, users, amount, year, childCount) {
+            document.getElementById('modalTitle').innerText = "Sửa kế hoạch";
+            document.getElementById('edit_id').value = id;
+            document.getElementById('edit_title').value = title;
+            document.getElementById('edit_year').value = year;
+            document.getElementById('edit_fromDate').value = fromDate;
+            document.getElementById('edit_toDate').value = toDate;
+            document.getElementById('edit_users').value = users;
+            document.getElementById('edit_child_count').value = childCount;
+            loadCategoriesByYear(year, categoryIds);
+
+            const select = document.getElementById('edit_categories');
+            Array.from(select.options).forEach(option => {
+                option.selected = categoryIds.includes(option.value.toString());
+            });
+
+            document.getElementById('btnDelete').style.display = 'block';
+            calculateTotal();
+            modal.classList.add('active');
+        }
+
+        function openChildEventModal(parentId, planTitle, planFrom, planTo, maxEvents, currentCount) {
+            const childModal = document.getElementById('modalChildEvent');
+            const childTitle = document.getElementById('childModalTitle');
+            const childParentId = document.getElementById('child_parent_event_id');
+            const childFrom = document.getElementById('child_fromDate');
+            const childTo = document.getElementById('child_toDate');
+            const childNote = document.getElementById('child_note');
+
+            childTitle.innerText = `Thêm sự kiện con cho kế hoạch "${planTitle}"`;
+            childParentId.value = parentId;
+            document.getElementById('child_title').value = '';
+            childFrom.min = planFrom;
+            childFrom.max = planTo;
+            childTo.min = planFrom;
+            childTo.max = planTo;
+            childFrom.value = planFrom;
+            childTo.value = planFrom;
+            childNote.value = `Đã tạo ${currentCount}/${maxEvents} sự kiện. Thời gian phải nằm trong ${planFrom} - ${planTo}.`;
+
+            childFrom.onchange = () => {
+                childTo.min = childFrom.value;
+                if (childTo.value < childFrom.value) {
+                    childTo.value = childFrom.value;
+                }
+            };
+
+            if (parseInt(currentCount) >= parseInt(maxEvents)) {
+                alert('Kế hoạch này đã đạt số lượng sự kiện con tối đa.');
+                return;
+            }
+
+            childModal.classList.add('active');
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+        }
+
+        function closeChildModal() {
+            document.getElementById('modalChildEvent').classList.remove('active');
+        }
+
+        function openEditChildEventModal(childId, childTitle, childFrom, childTo, parentId) {
+            const editChildModal = document.getElementById('modalEditChildEvent');
+            document.getElementById('edit_child_event_id').value = childId;
+            document.getElementById('edit_child_parent_event_id').value = parentId;
+            document.getElementById('edit_child_title').value = childTitle;
+            document.getElementById('edit_child_fromDate').value = childFrom;
+            document.getElementById('edit_child_toDate').value = childTo;
+            document.getElementById('edit_child_note').value = `Thời gian phải nằm trong khoảng kế hoạch cha. Chỉ có thể sửa tên và thời gian.`;
+
+            const childFromInput = document.getElementById('edit_child_fromDate');
+            const childToInput = document.getElementById('edit_child_toDate');
+
+            childFromInput.onchange = () => {
+                childToInput.min = childFromInput.value;
+                if (childToInput.value < childFromInput.value) {
+                    childToInput.value = childFromInput.value;
+                }
+            };
+
+            editChildModal.classList.add('active');
+        }
+
+        function closeEditChildModal() {
+            document.getElementById('modalEditChildEvent').classList.remove('active');
+        }
+
+        function deleteChildEvent(eventId) {
+            if (confirm('Bạn có chắc chắn muốn xóa sự kiện con này?')) {
+                window.location.href = `/xoaSuKien/${eventId}/`;
+            }
+        }
+
+        function calculateTotal() {
+            const users = parseInt(document.getElementById('edit_users').value) || 0;
+            const perUserPrice = parseFloat(document.getElementById('hidden_per_user_amount').value) || 0;
+            const selectCat = document.getElementById('edit_categories');
+            const amountInput = document.getElementById('edit_amount');
+            const btnSave = document.getElementById('btnSave');
+            const errorDiv = document.getElementById('budget-error');
+            const budgetYearNew = parseFloat(document.getElementById('hidden_total_year_budget').value) || 0;
+            document.getElementById('display_budget_year').innerText = budgetYearNew.toLocaleString('vi-VN');
+
+            let extraAmountPerPerson = 0;
+            Array.from(selectCat.selectedOptions).forEach(option => {
+                extraAmountPerPerson += parseFloat(option.getAttribute('data-amount')) || 0;
+            });
+
+            const finalTotal = (perUserPrice * users) + extraAmountPerPerson;
+
+            amountInput.value = finalTotal.toLocaleString('vi-VN');
+
+            if (finalTotal > budgetYearNew) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerText = `⚠️ Vượt ngân sách! (Tối đa: ${budgetYearNew.toLocaleString('vi-VN')} đ)`;
+                btnSave.disabled = true;
+            } else {
+                errorDiv.style.display = 'none';
+                btnSave.disabled = false;
+            }
+        }
+
+        function loadCategoriesByYear(year, selectedIds = []) {
+            if (!year) return;
+
+            const selectElement = document.getElementById('edit_categories');
+            const hiddenPerUserAmount = document.getElementById('hidden_per_user_amount');
+            const hiddenTotalYearBudget = document.getElementById('hidden_total_year_budget');
+
+            selectElement.innerHTML = '<option>Đang tải...</option>';
+
+            fetch(`/getCategories/?year=${year}`)
+                .then(response => response.json())
+                .then(data => {
+                    selectElement.innerHTML = '';
+
+                    if (data.categories && data.categories.length > 0) {
+                        data.categories.forEach(cat => {
+                            const option = document.createElement('option');
+                            option.value = cat.id;
+                            option.text = cat.name;
+                            option.setAttribute('data-amount', cat.amount || 0);
+
+                            if (selectedIds.map(String).includes(cat.id.toString())) {
+                                option.selected = true;
+                            }
+                            selectElement.appendChild(option);
+                        });
+                    } else {
+                        selectElement.innerHTML = '<option value="">Không có tiêu chí cho năm này</option>';
+                    }
+
+                    if (data.per_user_amount !== undefined) {
+                        hiddenPerUserAmount.value = data.per_user_amount;
+                    }
+
+                    if (data.totalAmountYear !== undefined) {
+                        hiddenTotalYearBudget.value = data.totalAmountYear;
+                    }
+
+                    document.getElementById('hidden_per_user_amount').value = data.per_user_amount || 0;
+                    document.getElementById('hidden_total_year_budget').value = data.totalAmountYear || 0;
+                    calculateTotal();
+
+                })
+                .catch(err => {
+                    console.error("Lỗi fetch:", err);
+                    selectElement.innerHTML = '<option>Lỗi kết nối server</option>';
+                });
+        }
+
+        function confirmDelete() {
+            const id = document.getElementById('edit_id').value;
+            if (confirm('Bạn có chắc chắn muốn xóa?')) {
+                window.location.href = `/xoaSuKien/${id}/`;
+            }
+        }
+
+        window.onclick = function (event) {
+            if (event.target == modal) closeModal();
+            if (event.target == document.getElementById('modalChildEvent')) closeChildModal();
+            if (event.target == document.getElementById('modalEditChildEvent')) closeEditChildModal();
+        }
+    </script>
+{% endblock %}

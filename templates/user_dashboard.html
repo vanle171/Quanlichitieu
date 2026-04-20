@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}User Dashboard{% endblock %}
+
+{% block extra_css %}
+    <style>
+        .welcome-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .welcome-section h1 {
+            margin-bottom: 10px;
+            color: white;
+        }
+
+        .welcome-section p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .create-event-section {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .events-section {
+            margin-top: 30px;
+        }
+
+        .events-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .event-card {
+            background: #fff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+            transition: box-shadow 0.2s;
+        }
+
+        .event-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .event-card h3 {
+            margin: 0 0 10px 0;
+            color: #000;
+        }
+
+        .event-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .info-label {
+            font-weight: 600;
+            margin-right: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .tags {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .tag {
+            background: #eee;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            color: #555;
+        }
+
+        .info-box {
+            background: #f0f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .info-box p {
+            margin: 0;
+            color: #666;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .btn-save {
+            background: #000;
+            color: #fff;
+            width: 100%;
+            margin-top: 15px;
+            border: none;
+            border-radius: 4px;
+            padding: 12px;
+            cursor: pointer;
+        }
+
+        .btn-save:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        #budget-error {
+            color: #ff4d4d;
+            font-size: 12px;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="create-event-section">
+        <h2 style="margin-bottom: 20px; color: #333;">Tạo Sự Kiện Mới</h2>
+        <form method="post" id="userEventForm">
+            {% csrf_token %}
+            <input type="hidden" id="hidden_per_user_amount" value="{{ per_user_amount|default:0 }}">
+            <input type="hidden" id="hidden_total_year_budget" value="{{ totalAmountYear|default:0 }}">
+
+            <div class="form-group">
+                <label>Tiêu đề sự kiện</label>
+                <input type="text" name="title" id="user_title" required>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Ngày bắt đầu</label>
+                    <input type="date" name="fromDate" id="user_fromDate" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Ngày kết thúc</label>
+                    <input type="date" name="toDate" id="user_toDate" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Năm</label>
+                <input type="number" name="year" id="user_year" value="2026" required onchange="loadUserCategoriesByYear(this.value)">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Số người tham gia</label>
+                    <input type="number" name="totalUserAllocated" id="user_users" value="0" min="0" oninput="calculateUserTotal()">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Tổng tiền (Tự động tính)</label>
+                    <input type="text" name="totalAmount" id="user_amount" readonly style="background: #f5f5f5; cursor: default;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Tiêu Chí (Chọn thêm)</label>
+                <select name="danh_muc" id="user_categories" multiple style="height: 100px;" onchange="calculateUserTotal()">
+                    {% for category in categories %}
+                        <option value="{{ category.id }}" data-amount="{{ category.amount }}">{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div id="budget-error">Vượt quá tổng ngân sách cấp trong năm.</div>
+
+            <button type="submit" class="btn-save" id="userBtnSave">Tạo Sự Kiện</button>
+        </form>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        function calculateUserTotal() {
+            const users = parseInt(document.getElementById('user_users').value) || 0;
+            const perUserPrice = parseFloat(document.getElementById('hidden_per_user_amount').value) || 0;
+            const selectCat = document.getElementById('user_categories');
+            const amountInput = document.getElementById('user_amount');
+            const btnSave = document.getElementById('userBtnSave');
+            const errorDiv = document.getElementById('budget-error');
+            const budgetYearNew = parseFloat(document.getElementById('hidden_total_year_budget').value) || 0;
+
+            let extraAmountPerPerson = 0;
+            Array.from(selectCat.selectedOptions).forEach(option => {
+                extraAmountPerPerson += parseFloat(option.getAttribute('data-amount')) || 0;
+            });
+
+            const finalTotal = (perUserPrice * users) + extraAmountPerPerson;
+            amountInput.value = finalTotal.toLocaleString('vi-VN');
+
+            if (finalTotal > budgetYearNew) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerText = `Vượt ngân sách! (Tối đa: ${budgetYearNew.toLocaleString('vi-VN')} đ)`;
+                btnSave.disabled = true;
+            } else {
+                errorDiv.style.display = 'none';
+                btnSave.disabled = false;
+            }
+        }
+
+        function loadUserCategoriesByYear(year, selectedIds = []) {
+            if (!year) return;
+
+            const selectElement = document.getElementById('user_categories');
+            const hiddenPerUserAmount = document.getElementById('hidden_per_user_amount');
+            const hiddenTotalYearBudget = document.getElementById('hidden_total_year_budget');
+
+            selectElement.innerHTML = '<option>Đang tải...</option>';
+
+            fetch(`/getCategories/?year=${year}`)
+                .then(response => response.json())
+                .then(data => {
+                    selectElement.innerHTML = '';
+
+                    if (data.categories && data.categories.length > 0) {
+                        data.categories.forEach(cat => {
+                            const option = document.createElement('option');
+                            option.value = cat.id;
+                            option.text = cat.name;
+                            option.setAttribute('data-amount', cat.amount || 0);
+
+                            if (selectedIds.map(String).includes(cat.id.toString())) {
+                                option.selected = true;
+                            }
+                            selectElement.appendChild(option);
+                        });
+                    } else {
+                        selectElement.innerHTML = '<option value="">Không có tiêu chí cho năm này</option>';
+                    }
+
+                    if (data.per_user_amount !== undefined) {
+                        hiddenPerUserAmount.value = data.per_user_amount;
+                    }
+
+                    if (data.totalAmountYear !== undefined) {
+                        hiddenTotalYearBudget.value = data.totalAmountYear;
+                    }
+
+                    calculateUserTotal();
+                })
+                .catch(err => {
+                    console.error("Lỗi fetch:", err);
+                    selectElement.innerHTML = '<option>Lỗi kết nối server</option>';
+                });
+        }
+
+        loadUserCategoriesByYear(document.getElementById('user_year').value);
+    </script>
+{% endblock %}

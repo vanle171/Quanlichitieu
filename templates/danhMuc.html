@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý Tiêu Chí{% endblock %}
+
+{% block extra_css %}
+    <style>
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background: #fafafa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        td {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        tr.clickable-row:hover {
+            background: #f9fafb;
+            cursor: pointer;
+        }
+
+        .col-amount {
+            text-align: right;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .filter-section {
+            margin-bottom: 15px;
+        }
+
+        .year-select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+            min-width: 150px;
+            cursor: pointer;
+        }
+
+        .year-select:focus {
+            border-color: #000;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            width: 400px;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .btn-add {
+            background: #000;
+            color: #fff;
+        }
+
+        .btn-save {
+            background: #000;
+            color: #fff;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .btn-cancel {
+            background: none;
+            color: #666;
+            margin-top: 10px;
+            width: 100%;
+            text-decoration: underline;
+            border: none;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .form-group input:focus {
+            border-color: #000;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <div>
+            <h1 style="font-size: 24px;">Quản lý Tiêu Chí</h1>
+        </div>
+        <button class="btn btn-add" onclick="openAddModal()">+ Thêm Tiêu Chí</button>
+    </header>
+
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 60px; text-align: center;">STT</th>
+                <th>Tên Tiêu Chí</th>
+                <th>Bắt đầu</th>
+                <th>Kết thúc</th>
+                <th>Năm</th>
+                <th class="text-right">Số tiền (Amount)</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for cat in all_categories %}
+                <tr class="clickable-row"
+                    onclick="openEditModal('{{ cat.id }}', '{{ cat.name }}', '{{ cat.amount }}', '{{ cat.fromDate|date:'Y-m-d' }}', '{{ cat.toDate|date:'Y-m-d' }}', '{{ cat.year }}')">
+                    <td style="color: #999; text-align: center;">{{ forloop.counter }}</td>
+                    <td><strong>{{ cat.name }}</strong></td>
+                    <td>{{ cat.fromDate|date:"d/m/Y" }}</td>
+                    <td>{{ cat.toDate|date:"d/m/Y" }}</td>
+                    <td>{{ cat.year }}</td>
+                    <td class="col-amount text-right">
+                        <script>document.write(Number('{{ cat.amount }}').toLocaleString('vi-VN'));</script>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: #999; padding: 50px;">Chưa có dữ liệu nào.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="modal-overlay" id="modalCategory">
+        <div class="modal-content">
+            <h3 id="modalTitle" style="margin-bottom: 20px; font-size: 18px;">Thêm Tiêu Chí</h3>
+            <form action="{% url 'quanLyDanhMuc' %}" method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="id" id="edit_id" value="">
+
+                <div class="form-group">
+                    <label>Tên Tiêu Chí</label>
+                    <input type="text" name="name" id="edit_name" required>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Từ ngày</label>
+                        <input type="date" name="fromDate" id="edit_fromDate" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Đến ngày</label>
+                        <input type="date" name="toDate" id="edit_toDate" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Năm</label>
+                    <input type="text" name="year" id="edit_year" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Số tiền (Amount)</label>
+                    <input type="text" name="amount" id="edit_amount" oninput="formatCurrency(this)" placeholder="0"
+                           required>
+                </div>
+
+                <button type="submit" class="btn btn-save">Xác nhận lưu</button>
+                <button type="button" id="btnDelete" class="btn"
+                        style="color: #fff; width: 100%; margin-top: 15px; border-radius: 4px; padding: 12px; background: #ff4d4d;"
+                        onclick="confirmDelete()">Xóa
+                </button>
+                <button type="button" class="btn btn-cancel" onclick="closeModal()">Hủy bỏ</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        const modal = document.getElementById('modalCategory');
+        const btnDelete = document.getElementById('btnDelete');
+
+        function openAddModal() {
+            document.getElementById('modalTitle').innerText = "Thêm Tiêu Chí";
+            document.getElementById('edit_id').value = "";
+            document.getElementById('edit_name').value = "";
+            document.getElementById('edit_amount').value = "";
+            document.getElementById('edit_year').value = "";
+            document.getElementById('edit_fromDate').value = "";
+            document.getElementById('edit_toDate').value = "";
+            btnDelete.style.display = "none";
+            modal.classList.add('active');
+        }
+
+        function openEditModal(id, name, amount, fromDate, toDate, year) {
+            document.getElementById('modalTitle').innerText = "Chỉnh sửa Tiêu Chí";
+            document.getElementById('edit_id').value = id;
+            document.getElementById('edit_name').value = name;
+            document.getElementById('edit_fromDate').value = fromDate;
+            document.getElementById('edit_toDate').value = toDate;
+            document.getElementById('edit_year').value = year;
+
+            if (amount) {
+                let cleanAmount = amount.replace(/[.,]/g, '');
+                document.getElementById('edit_amount').value = Number(cleanAmount).toLocaleString('vi-VN');
+            }
+
+            btnDelete.style.display = "block";
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+        }
+
+        function confirmDelete() {
+            const id = document.getElementById('edit_id').value;
+            if (confirm("Bạn có chắc chắn muốn xóa tiêu chí này không?")) {
+                window.location.href = `/xoaTieuChi/${id}/`;
+            }
+        }
+
+        function formatCurrency(input) {
+            let value = input.value.replace(/\D/g, "");
+            if (value !== "") {
+                input.value = Number(value).toLocaleString('vi-VN');
+            } else {
+                input.value = "";
+            }
+        }
+
+        window.onclick = function (event) {
+            if (event.target === modal) closeModal();
+        }
+    </script>
+{% endblock %}
