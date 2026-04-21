@@ -342,25 +342,21 @@ def quan_ly_view(request):
 @admin_required
 def quan_ly_da_dien_ra_view(request):
     today = date.today()
-
     all_categories = Category.objects.all().exclude(
-        Q(name=TOTAL_AMOUNT_ALLOCATED) |
-        Q(name=AMOUNT_ALLOCATED_PERSON)
+        Q(name=TOTAL_AMOUNT_ALLOCATED) | Q(name=AMOUNT_ALLOCATED_PERSON)
     )
 
-    # Lọc các sự kiện đã diễn ra (toDate < hôm nay)
+    # Lấy tất cả sự kiện đã kết thúc (toDate < today) và đã được duyệt
     events = Event.objects.filter(
-        is_adhoc=False,
         approval_status=EventApprovalStatus.APPROVED,
-        toDate__lt=today,
-        parent_event__isnull=True,
+        toDate__lt=today
     ).order_by('-toDate')
+
     context = {
         'all_categories': all_categories,
         'events': events,
     }
     return render(request, 'user_quanLySuKienDaDienRa.html', context)
-
 
 @login_required(login_url='/login/')
 @admin_required

@@ -123,7 +123,7 @@
                                     </form>
                                     <form action="{% url 'khongDuyetSuKien' event.id %}" method="post" style="display:inline; margin-left: 10px;">
                                         {% csrf_token %}
-                                        <button type="submit" class="btn btn-reject" onclick="return confirm('Bạn có chắc muốn từ chối duyệt sự kiện này?')">Không duyệt nữa</button>
+                                        <button type="submit" class="btn btn-reject" onclick="return confirm('Bạn có chắc muốn từ chối duyệt sự kiện này?')">Không duyệt</button>
                                     </form>
                                 </td>
                             </tr>
