@@ -352,9 +352,26 @@ def quan_ly_da_dien_ra_view(request):
         toDate__lt=today
     ).order_by('-toDate')
 
+    parent_events = Event.objects.filter(
+        is_adhoc=False,
+        approval_status=EventApprovalStatus.APPROVED,
+        toDate__gte=today,
+        parent_event__isnull=True,
+    ).annotate(num_child_events=Count('child_events')).order_by('-fromDate')
+    events_with_children = []
+    for parent in parent_events:
+        events_with_children.append({
+            'event': parent,
+            'is_parent': True,
+            'children': list(parent.child_events.all().order_by('fromDate'))
+        })
+        if parent.num_child_events >= 1:
+            parent.totalAmount = parent.totalAmount * parent.num_child_events
+
     context = {
         'all_categories': all_categories,
         'events': events,
+        'events_with_children': events_with_children,
     }
     return render(request, 'user_quanLySuKienDaDienRa.html', context)
 

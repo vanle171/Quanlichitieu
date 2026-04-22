@@ -194,14 +194,14 @@
                         đ
                     </td>
                     <td style="text-align: center;">
-                        <button type="button" class="btn btn-add" onclick="event.stopPropagation(); openChildEventModal('{{ item.id }}', '{{ item.title|escapejs }}', '{{ item.fromDate|date:'Y-m-d' }}', '{{ item.toDate|date:'Y-m-d' }}', '{{ item.so_luong_su_kien_con }}', '{{ item_wrapper.children|length }}')" {% if item_wrapper.children|length >= item.so_luong_su_kien_con %}disabled style="opacity:0.6; cursor:not-allowed;"{% endif %}>
+                        <button type="button" class="btn btn-add" onclick="event.stopPropagation(); openChildEventModal('{{ item.id }}', '{{ item.title|escapejs }}', '{{ item.fromDate|date:'Y-m-d' }}', '{{ item.toDate|date:'Y-m-d' }}', '{{ item.so_luong_su_kien_con }}', '{{ item_wrapper.children|length }}')" {% if item_wrapper.children|length >= item.so_luong_su_kien_con %}disabled style="opacity:0.6; cursor:not-allowed;white-space: nowrap;"{% endif %}>
                             Thêm sự kiện
                         </button>
                     </td>
                 </tr>
 
                 {% for child in item_wrapper.children %}
-                <tr style="background-color: #f9fafb; border-left: 4px solid #007bff;">
+                <tr style="background-color: #f9fafb; border-left: 4px solid #ffc800;">
                     <td style="text-align: center; color: #999;"></td>
                     <td style="padding-left: 40px;">
                         <span style="color: #007bff; font-size: 12px; font-weight: bold; margin-right: 8px;">└─</span>

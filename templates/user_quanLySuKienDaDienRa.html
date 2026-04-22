@@ -47,6 +47,30 @@
             margin-right: 5px;
             color: #555;
         }
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 20px;
+            font-family: sans-serif;
+        }
+
+        .tag {
+            background-color: #f0f2f5;
+            color: #4b5563;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .tag:hover {
+            background-color: #e2e8f0;
+            color: #1f2937;
+            border-color: #d1d5db;
+        }
 
     </style>
 {% endblock %}
@@ -71,23 +95,44 @@
             </tr>
             </thead>
             <tbody>
-            {% for event in events %}
-                <tr>
+            {% for item_wrapper in events_with_children %}
+                {% with item=item_wrapper.event %}
+                <tr class="clickable-row">
                     <td style="text-align: center; color: #999;">{{ forloop.counter }}</td>
-                    <td><strong>{{ event.title }}</strong></td>
-                    <td>{{ event.fromDate|date:"d/m/Y" }}</td>
-                    <td>{{ event.toDate|date:"d/m/Y" }}</td>
-                    <td><strong>{{ event.year }}</strong></td>
-                    <td style="text-align: right;">{{ event.totalUserAllocated|default:"0" }}</td>
+                    <td><strong>{{ item.title }}</strong></td>
+                    <td>{{ item.fromDate|date:"d/m/Y" }}</td>
+                    <td>{{ item.toDate|date:"d/m/Y" }}</td>
+                    <td><strong>{{ item.year }}</strong></td>
+                    <td style="text-align: right;">{{ item.totalUserAllocated|default:"0" }}</td>
+                    <td style="text-align: center;">{{ item_wrapper.children|length }} / {{ item.so_luong_su_kien_con }}</td>
                     <td style="text-align: right; font-weight: bold;">
-                        <script>document.write(Number('{{ event.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
+                        <script>document.write(Number('{{ item.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
                         đ
                     </td>
-                    <td>
-                        {% for cat in event.categories.all %}
-                            <span class="tag">{{ cat.name }}</span>
-                        {% endfor %}
+                </tr>
+
+                {% for child in item_wrapper.children %}
+                <tr style="background-color: #f9fafb; border-left: 4px solid #ffc800;">
+                    <td style="text-align: center; color: #999;"></td>
+                    <td style="padding-left: 40px;">
+                        <span style="color: #007bff; font-size: 12px; font-weight: bold; margin-right: 8px;">└─</span>
+                        {{ child.title }}
                     </td>
+                    <td>{{ child.fromDate|date:"d/m/Y" }}</td>
+                    <td>{{ child.toDate|date:"d/m/Y" }}</td>
+                    <td></td>
+                    <td style="text-align: right;">{{ child.totalUserAllocated|default:"0" }}</td>
+                    <td></td>
+                    <td style="text-align: right; font-weight: bold;">
+                        <script>document.write(Number('{{ child.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
+                        đ
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endwith %}
+            {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: #999; padding: 40px;">Chưa có dữ liệu nào.</td>
                 </tr>
             {% endfor %}
             </tbody>
