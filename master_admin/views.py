@@ -5,7 +5,7 @@ from master_admin.models import EventCategory
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.shortcuts import get_object_or_404
@@ -342,22 +342,37 @@ def quan_ly_view(request):
 @admin_required
 def quan_ly_da_dien_ra_view(request):
     today = date.today()
+    selected_year = request.GET.get('year', '')
     all_categories = Category.objects.all().exclude(
         Q(name=TOTAL_AMOUNT_ALLOCATED) | Q(name=AMOUNT_ALLOCATED_PERSON)
     )
+
+    available_years = Event.objects.filter(
+        approval_status=EventApprovalStatus.APPROVED,
+        toDate__lt=today
+    ).exclude(year__isnull=True).order_by('-year').values_list('year', flat=True).distinct()
 
     # Lấy tất cả sự kiện đã kết thúc (toDate < today) và đã được duyệt
     events = Event.objects.filter(
         approval_status=EventApprovalStatus.APPROVED,
         toDate__lt=today
-    ).order_by('-toDate')
+    )
+
+    if selected_year:
+        events = events.filter(year=selected_year)
+
+    events = events.order_by('-toDate')
 
     parent_events = Event.objects.filter(
         is_adhoc=False,
         approval_status=EventApprovalStatus.APPROVED,
-        toDate__gte=today,
+        toDate__lt=today,
         parent_event__isnull=True,
-    ).annotate(num_child_events=Count('child_events')).order_by('-fromDate')
+    )
+    if selected_year:
+        parent_events = parent_events.filter(year=selected_year)
+
+    parent_events = parent_events.annotate(num_child_events=Count('child_events')).order_by('-fromDate')
     events_with_children = []
     for parent in parent_events:
         events_with_children.append({
@@ -372,8 +387,109 @@ def quan_ly_da_dien_ra_view(request):
         'all_categories': all_categories,
         'events': events,
         'events_with_children': events_with_children,
+        'available_years': available_years,
+        'selected_year': selected_year,
     }
     return render(request, 'user_quanLySuKienDaDienRa.html', context)
+
+
+@login_required(login_url='/login/')
+@admin_required
+def thong_ke_su_kien_theo_nam_view(request):
+    today = date.today()
+    planned_stats = list(
+        Event.objects.filter(
+            is_adhoc=False,
+            approval_status=EventApprovalStatus.APPROVED,
+            toDate__gte=today,
+            parent_event__isnull=True,
+        )
+        .exclude(year__isnull=True)
+        .values('year')
+        .annotate(total=Count('child_events'))
+        .order_by('year')
+    )
+    planned_amount_stats = {}
+    planned_amount_events = list(
+        Event.objects.filter(
+            is_adhoc=False,
+            approval_status=EventApprovalStatus.APPROVED,
+            toDate__gte=today,
+            parent_event__isnull=True,
+        )
+        .exclude(year__isnull=True)
+        .values('year', 'totalAmount')
+        .annotate(total=Count('child_events'))
+        .order_by('year')
+    )
+    for item in planned_amount_events:
+        if not item['total']:
+            continue
+        planned_amount_stats[item['year']] = planned_amount_stats.get(item['year'], 0) + (item['totalAmount'] or 0) * item['total']
+
+    adhoc_stats = list(
+        Event.objects.filter(
+            is_adhoc=True,
+            approval_status=EventApprovalStatus.APPROVED,
+            toDate__gte=today,
+        )
+        .exclude(year__isnull=True)
+        .values('year')
+        .annotate(total=Count('id'))
+        .order_by('year')
+    )
+    adhoc_amount_stats = list(
+        Event.objects.filter(
+            is_adhoc=True,
+            approval_status=EventApprovalStatus.APPROVED,
+            toDate__gte=today,
+        )
+        .exclude(year__isnull=True)
+        .values('year')
+        .annotate(total_amount=Sum('totalAmount'))
+        .order_by('year')
+    )
+
+    stats_by_year = {}
+    for item in planned_stats + adhoc_stats:
+        if not item['total']:
+            continue
+        stats_by_year[item['year']] = stats_by_year.get(item['year'], 0) + item['total']
+
+    yearly_stats = [
+        {'year': year, 'total': total}
+        for year, total in sorted(stats_by_year.items())
+    ]
+    max_total = max((item['total'] for item in yearly_stats), default=0)
+
+    for item in yearly_stats:
+        item['bar_height'] = round(item['total'] / max_total * 100, 2) if max_total else 0
+
+    amounts_by_year = {}
+    for year, total_amount in planned_amount_stats.items():
+        amounts_by_year[year] = amounts_by_year.get(year, 0) + total_amount
+    for item in adhoc_amount_stats:
+        amounts_by_year[item['year']] = amounts_by_year.get(item['year'], 0) + (item['total_amount'] or 0)
+
+    yearly_amount_stats = [
+        {'year': year, 'total_amount': total_amount}
+        for year, total_amount in sorted(amounts_by_year.items())
+    ]
+    max_amount = max((item['total_amount'] for item in yearly_amount_stats), default=0)
+
+    for item in yearly_amount_stats:
+        item['bar_height'] = round(item['total_amount'] / max_amount * 100, 2) if max_amount else 0
+
+    context = {
+        'yearly_stats': yearly_stats,
+        'yearly_amount_stats': yearly_amount_stats,
+        'max_total': max_total,
+        'max_amount': max_amount,
+        'total_events': sum(item['total'] for item in yearly_stats),
+        'total_amount': sum(item['total_amount'] for item in yearly_amount_stats),
+    }
+    return render(request, 'thongKeSuKienTheoNam.html', context)
+
 
 @login_required(login_url='/login/')
 @admin_required
@@ -432,6 +548,17 @@ def quan_ly_su_kien_phat_sinh_view(request):
         Q(name=AMOUNT_ALLOCATED_PERSON)
     )
     today = date.today()
+    selected_year = request.GET.get('year', '')
+    available_years = Event.objects.filter(
+        is_adhoc=True,
+        approval_status__in=[
+            EventApprovalStatus.APPROVED,
+            EventApprovalStatus.REJECTED,
+            EventApprovalStatus.PENDING
+        ],
+        toDate__gte=today
+    ).exclude(year__isnull=True).order_by('-year').values_list('year', flat=True).distinct()
+
     events = Event.objects.filter(
         is_adhoc=True,
         approval_status__in=[
@@ -440,10 +567,16 @@ def quan_ly_su_kien_phat_sinh_view(request):
             EventApprovalStatus.PENDING
         ],
         toDate__gte=today
-    ).order_by('-fromDate')
+    )
+    if selected_year:
+        events = events.filter(year=selected_year)
+
+    events = events.order_by('-fromDate')
     context = {
         'all_categories': all_categories,
         'events': events,
+        'available_years': available_years,
+        'selected_year': selected_year,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED),
     }
@@ -681,21 +814,55 @@ def user_quan_ly_view(request):
 def user_quan_ly_da_dien_ra_view(request):
     """User view for quanLySuKienDaDienRa - read-only"""
     today = date.today()
+    selected_year = request.GET.get('year', '')
 
     all_categories = Category.objects.all().exclude(
         Q(name=TOTAL_AMOUNT_ALLOCATED) |
         Q(name=AMOUNT_ALLOCATED_PERSON)
     )
 
+    available_years = Event.objects.filter(
+        toDate__lt=today,
+        approval_status=EventApprovalStatus.APPROVED
+    ).exclude(year__isnull=True).order_by('-year').values_list('year', flat=True).distinct()
+
     # Lọc các sự kiện đã diễn ra (toDate < hôm nay)
     events = Event.objects.filter(
         toDate__lt=today,
         approval_status=EventApprovalStatus.APPROVED
-    ).order_by('-toDate')
+    )
+
+    if selected_year:
+        events = events.filter(year=selected_year)
+
+    events = events.order_by('-toDate')
+
+    parent_events = Event.objects.filter(
+        is_adhoc=False,
+        toDate__lt=today,
+        approval_status=EventApprovalStatus.APPROVED,
+        parent_event__isnull=True,
+    )
+    if selected_year:
+        parent_events = parent_events.filter(year=selected_year)
+
+    parent_events = parent_events.annotate(num_child_events=Count('child_events')).order_by('-fromDate')
+    events_with_children = []
+    for parent in parent_events:
+        events_with_children.append({
+            'event': parent,
+            'is_parent': True,
+            'children': list(parent.child_events.all().order_by('fromDate'))
+        })
+        if parent.num_child_events >= 1:
+            parent.totalAmount = parent.totalAmount * parent.num_child_events
 
     context = {
         'events': events,
+        'events_with_children': events_with_children,
         'all_categories': all_categories,
+        'available_years': available_years,
+        'selected_year': selected_year,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED),
     }
@@ -707,11 +874,22 @@ def user_quan_ly_da_dien_ra_view(request):
 def user_quan_ly_su_kien_phat_sinh_view(request):
     """User view for quanLySuKienPhatSinh - read-only"""
     today = date.today()
+    selected_year = request.GET.get('year', '')
 
     all_categories = Category.objects.all().exclude(
         Q(name=TOTAL_AMOUNT_ALLOCATED) |
         Q(name=AMOUNT_ALLOCATED_PERSON)
     )
+
+    available_years = Event.objects.filter(
+        is_adhoc=True,
+        approval_status__in=[
+            EventApprovalStatus.APPROVED,
+            EventApprovalStatus.REJECTED,
+            EventApprovalStatus.PENDING
+        ],
+        toDate__gte=today
+    ).exclude(year__isnull=True).order_by('-year').values_list('year', flat=True).distinct()
 
     # Lọc các sự kiện phát sinh đã duyệt
     events = Event.objects.filter(
@@ -722,11 +900,17 @@ def user_quan_ly_su_kien_phat_sinh_view(request):
             EventApprovalStatus.PENDING
         ],
         toDate__gte=today
-    ).order_by('-fromDate')
+    )
+    if selected_year:
+        events = events.filter(year=selected_year)
+
+    events = events.order_by('-fromDate')
 
     context = {
         'events': events,
         'all_categories': all_categories,
+        'available_years': available_years,
+        'selected_year': selected_year,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED),
     }

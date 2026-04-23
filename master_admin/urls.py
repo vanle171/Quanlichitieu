@@ -10,6 +10,7 @@ urlpatterns = [
     path('dashboard/', views.user_dashboard, name='user_dashboard'),
     path('quanLySuKien/', views.quan_ly_view, name='quanLySuKien'),
     path('quanLySuKienDaDienRa/', views.quan_ly_da_dien_ra_view, name='quanLySuKienDaDienRa'),
+    path('thongKeSuKienTheoNam/', views.thong_ke_su_kien_theo_nam_view, name='thongKeSuKienTheoNam'),
     path('quanLySuKienPhatSinh/', views.quan_ly_su_kien_phat_sinh_view, name='quanLySuKienPhatSinh'),
     path('duyetSuKien/', views.duyet_su_kien_view, name='duyetSuKien'),
     path('pheDuyetSuKien/<int:event_id>/', views.phe_duyet_su_kien_view, name='pheDuyetSuKien'),
