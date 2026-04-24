@@ -19,7 +19,7 @@ def _get_fixed_category_amount(category_name):
     category = Category.objects.filter(name=category_name).only('amount').first()
     if not category or category.amount is None:
         return 0
-    return float(category.amount/10*9)
+    return float(category.amount)
 
 def _get_fixed_category_amounts(category_name):
     category = Category.objects.filter(name=category_name).only('amount').first()
@@ -193,7 +193,7 @@ def user_dashboard(request):
         'upcoming_events': upcoming_events,
         'categories': categories,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
-        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED),
+        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9,
     }
     return render(request, 'user_dashboard.html', context)
 
@@ -302,10 +302,8 @@ def quan_ly_view(request):
                 messages.success(request, "Lưu sự kiện thành công!")
             to_date_obj = datetime.strptime(toDate, '%Y-%m-%d').date()
             today = date.today()
-            if to_date_obj < today:
-                return redirect('quanLySuKienDaDienRa')
-            else:
-                return redirect('quanLySuKien')
+            
+            return redirect('quanLySuKien')
         else:
             messages.error(request, "Vui lòng điền đầy đủ thông tin.")
     all_categories = Category.objects.exclude(
@@ -333,7 +331,7 @@ def quan_ly_view(request):
         'events': parent_events,
         'events_with_children': events_with_children,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
-        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED),
+        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9,
     }
     return render(request, 'quanLySuKien.html', context)
 
@@ -655,12 +653,12 @@ def get_categories(request):
     categories_list = list(categories)
 
     # Nếu là sự kiện phát sinh thì dùng hàm _get_fixed_category_amounts (có /10)
-    total_year = _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED) if is_adhoc else _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)
+    total_year = _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED) if is_adhoc else _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9
 
     return JsonResponse({
         'categories': categories_list,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
-        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED),
+        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9,
         'totalAmountYear': total_year,
     }, safe=False)
 
@@ -804,7 +802,7 @@ def user_quan_ly_view(request):
         'events': parent_events,
         'events_with_children': events_with_children,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
-        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED),
+        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9,
     }
 
     return render(request, 'user_quanLySuKien.html', context)

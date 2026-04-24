@@ -150,41 +150,29 @@
             </tr>
             </thead>
             <tbody>
-            {% for item_wrapper in events_with_children %}
-                {% with item=item_wrapper.event %}
-                <tr class="clickable-row">
+            {% for event in events %}
+                <tr {% if event.parent_event %}style="background-color: #f9fafb; border-left: 4px solid #ffc800;"{% endif %}>
                     <td style="text-align: center; color: #999;">{{ forloop.counter }}</td>
-                    <td><strong>{{ item.title }}</strong></td>
-                    <td>{{ item.fromDate|date:"d/m/Y" }}</td>
-                    <td>{{ item.toDate|date:"d/m/Y" }}</td>
-                    <td><strong>{{ item.year }}</strong></td>
-                    <td style="text-align: right;">{{ item.totalUserAllocated|default:"0" }}</td>
-                    <td style="text-align: center;">{{ item_wrapper.children|length }} / {{ item.so_luong_su_kien_con }}</td>
+                    <td {% if event.parent_event %}style="padding-left: 40px;"{% endif %}>
+                        {% if event.parent_event %}
+                            <span style="color: #007bff; font-size: 12px; font-weight: bold; margin-right: 8px;">└─</span>
+                        {% endif %}
+                        {{ event.title }}
+                    </td>
+                    <td>{{ event.fromDate|date:"d/m/Y" }}</td>
+                    <td>{{ event.toDate|date:"d/m/Y" }}</td>
+                    <td><strong>{{ event.year }}</strong></td>
+                    <td style="text-align: right;">{{ event.totalUserAllocated|default:"0" }}</td>
                     <td style="text-align: right; font-weight: bold;">
-                        <script>document.write(Number('{{ item.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
+                        <script>document.write(Number('{{ event.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
                         đ
                     </td>
-                </tr>
-
-                {% for child in item_wrapper.children %}
-                <tr style="background-color: #f9fafb; border-left: 4px solid #ffc800;">
-                    <td style="text-align: center; color: #999;"></td>
-                    <td style="padding-left: 40px;">
-                        <span style="color: #007bff; font-size: 12px; font-weight: bold; margin-right: 8px;">└─</span>
-                        {{ child.title }}
-                    </td>
-                    <td>{{ child.fromDate|date:"d/m/Y" }}</td>
-                    <td>{{ child.toDate|date:"d/m/Y" }}</td>
-                    <td></td>
-                    <td style="text-align: right;">{{ child.totalUserAllocated|default:"0" }}</td>
-                    <td></td>
-                    <td style="text-align: right; font-weight: bold;">
-                        <script>document.write(Number('{{ child.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
-                        đ
+                    <td>
+                        {% for cat in event.categories.all %}
+                            <span class="tag">{{ cat.name }}</span>
+                        {% endfor %}
                     </td>
                 </tr>
-                {% endfor %}
-                {% endwith %}
             {% empty %}
                 <tr>
                     <td colspan="9" style="text-align: center; color: #999; padding: 40px;">Chưa có dữ liệu nào.</td>
