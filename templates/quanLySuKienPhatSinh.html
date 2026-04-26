@@ -86,6 +86,13 @@
             background: #f9fafb;
         }
 
+        .criteria-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px 0;
+        }
+
         .tag {
             background: #eee;
             padding: 3px 8px;
@@ -93,6 +100,9 @@
             font-size: 11px;
             margin-right: 5px;
             color: #555;
+            display: inline-block;
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
         .status-approved {
@@ -295,7 +305,7 @@
                     <td><strong>{{ item.title }}</strong></td>
                     <td>{{ item.fromDate|date:"d/m/Y" }}</td>
                     <td>{{ item.toDate|date:"d/m/Y" }}</td>
-                    <td class="tag-container">
+                    <td class="tag-container criteria-container">
                         {% for cat in item.categories.all %}
                             <span class="tag">{{ cat.name }}</span>
                         {% endfor %}
@@ -325,8 +335,14 @@
 
             <tfoot>
             <tr>
-                <td colspan="7" style="text-align: right; padding: 15px 20px;">Tổng tiền phát sinh được cấp trong năm:</td>
-                <td colspan="2" style="text-align: right; padding: 15px 20px; font-size: 15px; color: #000;">
+                <td colspan="6" style="text-align: right; padding: 15px 20px;">Tổng tiền phát sinh đã sử dụng trong năm:</td>
+                <td colspan="8" style="text-align: right; padding: 15px 20px; font-size: 15px; color: #000;font-weight: bold;">
+                    <span id="total_all_parents" value="{{ total_all_parents|default:0 }}"> <script>document.write(Number('{{ total_all_parents|default:"0" }}').toLocaleString('vi-VN'));</script></span> đ
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6" style="text-align: right; padding: 15px 20px;">Tổng tiền phát sinh được cấp trong năm:</td>
+                <td colspan="8" style="text-align: right; padding: 15px 20px; font-size: 15px; color: #000;font-weight: bold;">
                     <span id="display_budget_year"></span> đ
                 </td>
             </tr>

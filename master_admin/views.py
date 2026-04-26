@@ -318,6 +318,7 @@ def quan_ly_view(request):
         parent_event__isnull=True,
     ).annotate(num_child_events=Count('child_events')).order_by('-fromDate')
     events_with_children = []
+    total_all_parents = 0
     for parent in parent_events:
         events_with_children.append({
             'event': parent,
@@ -326,10 +327,12 @@ def quan_ly_view(request):
         })
         if parent.num_child_events >= 1:
             parent.totalAmount = parent.totalAmount * parent.num_child_events
+        total_all_parents += parent.totalAmount
     context = {
         'all_categories': all_categories,
         'events': parent_events,
         'events_with_children': events_with_children,
+        'total_all_parents': total_all_parents,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9,
     }
@@ -569,12 +572,17 @@ def quan_ly_su_kien_phat_sinh_view(request):
     if selected_year:
         events = events.filter(year=selected_year)
 
+    total_all_parents = 0
+    for event in events:
+        total_all_parents += event.totalAmount
+
     events = events.order_by('-fromDate')
     context = {
         'all_categories': all_categories,
         'events': events,
         'available_years': available_years,
         'selected_year': selected_year,
+        'total_all_parents': total_all_parents,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED),
     }
@@ -788,6 +796,7 @@ def user_quan_ly_view(request):
 
     # Xây dựng danh sách events với cha và con
     events_with_children = []
+    total_all_parents = 0
     for parent in parent_events:
         events_with_children.append({
             'event': parent,
@@ -796,11 +805,13 @@ def user_quan_ly_view(request):
         })
         if parent.num_child_events >= 1:
             parent.totalAmount = parent.totalAmount * parent.num_child_events
+        total_all_parents += parent.totalAmount
 
     context = {
         'all_categories': all_categories,
         'events': parent_events,
         'events_with_children': events_with_children,
+        'total_all_parents': total_all_parents,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9,
     }
@@ -901,6 +912,9 @@ def user_quan_ly_su_kien_phat_sinh_view(request):
     )
     if selected_year:
         events = events.filter(year=selected_year)
+    total_all_parents = 0
+    for event in events:
+        total_all_parents += event.totalAmount
 
     events = events.order_by('-fromDate')
 
@@ -909,6 +923,7 @@ def user_quan_ly_su_kien_phat_sinh_view(request):
         'all_categories': all_categories,
         'available_years': available_years,
         'selected_year': selected_year,
+        'total_all_parents': total_all_parents,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED),
     }

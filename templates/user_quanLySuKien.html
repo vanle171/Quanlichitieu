@@ -113,8 +113,14 @@
 
             <tfoot>
             <tr>
-                <td colspan="7" style="text-align: right; padding: 15px 20px;">Tổng tiền phát sinh được cấp trong năm:</td>
-                <td style="text-align: right; padding: 15px 20px; font-size: 15px; color: #000;">
+                <td colspan="6" style="text-align: right; padding: 15px 20px;">Tổng tiền phát sinh đã sử dụng trong năm:</td>
+                <td style="text-align: right; padding: 15px 20px; font-size: 15px; color: #000;" colspan="3">
+                    <span id="total_all_parents" value="{{ total_all_parents|default:0 }}"> <script>document.write(Number('{{ total_all_parents|default:"0" }}').toLocaleString('vi-VN'));</script></span> đ
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6" style="text-align: right; padding: 15px 20px;">Tổng tiền phát sinh được cấp trong năm:</td>
+                <td style="text-align: right; padding: 15px 20px; font-size: 15px; color: #000;" colspan="3">
                     <span id="display_budget_year"></span> đ
                 </td>
             </tr>
