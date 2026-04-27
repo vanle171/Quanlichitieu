@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Xem sự kiện phát sinh{% endblock %}
+
+{% block extra_css %}
+    <style>
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .status-rejected {
+            background: #c61d2b;
+            color: #0c0405;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .status-pending {
+            background: #f8d7da;
+            color: #842029;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background: #fafafa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .criteria-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px 0;
+        }
+
+        .tag {
+            background: #eee;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-right: 5px;
+            color: #555;
+            display: inline-block;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .status-approved {
+            background: #d4edda;
+            color: #155724;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+    </style>
+{% endblock %}
+
+{% block content %}
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; width: 100%;">
+        <h1>Xem sự kiện phát sinh</h1>
+    </header>
+
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 50px; text-align: center;">STT</th>
+                <th>Tên sự kiện</th>
+                <th>Ngày bắt đầu</th>
+                <th>Ngày kết thúc</th>
+                <th>Năm</th>
+                <th style="text-align: right;">Người</th>
+                <th style="text-align: right;">Tổng tiền</th>
+                <th>Tiêu chí</th>
+                <th>Trạng thái</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for event in events %}
+                <tr>
+                    <td style="text-align: center; color: #999;">{{ forloop.counter }}</td>
+                    <td><strong>{{ event.title }}</strong></td>
+                    <td>{{ event.fromDate|date:"d/m/Y" }}</td>
+                    <td>{{ event.toDate|date:"d/m/Y" }}</td>
+                    <td><strong>{{ event.year }}</strong></td>
+                    <td style="text-align: right;">{{ event.totalUserAllocated|default:"0" }}</td>
+                    <td style="text-align: right; font-weight: bold;">
+                        <script>document.write(Number('{{ event.totalAmount|default:"0" }}').toLocaleString('vi-VN'));</script>
+                        đ
+                    </td>
+                    <td class="criteria-container">
+                        {% for cat in event.categories.all %}
+                            <span class="tag">{{ cat.name }}</span>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% if event.approval_status == 2 %}
+                            <span class="status-approved">{{ event.get_approval_status_display }}</span>
+                        {% elif event.approval_status == 1 %}
+                            <span class="status-pending">{{ event.get_approval_status_display }}</span>
+                        {% else %}
+                            <span class="status-rejected">{{ event.get_approval_status_display }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+
+            <tfoot>
+            <tr>
+                <td colspan="6" style="text-align: right; padding: 15px 20px;font-weight: bold;">Tổng tiền phát sinh đã sử dụng trong năm:</td>
+                <td style="padding: 15px 20px; font-size: 15px; color: #000;font-weight: bold;" colspan="3">
+                    <span id="total_all_parents" value="{{ total_all_parents|default:0 }}"> <script>document.write(Number('{{ total_all_parents|default:"0" }}').toLocaleString('vi-VN'));</script></span> đ
+                </td>
+            </tr>
+            <tr>
+                <td colspan="6" style="text-align: right; padding: 15px 20px;font-weight: bold;">Tổng tiền phát sinh được cấp trong năm:</td>
+                <td colspan="2" style="padding: 15px 20px; font-size: 15px; color: #000;font-weight: bold;">
+                    <span id="display_budget_year"></span> đ
+                </td>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        const budgetYear = parseFloat('{{ totalAmountYear|default:"0" }}') || 0;
+        document.getElementById('display_budget_year').innerText = budgetYear.toLocaleString('vi-VN');
+    </script>
+{% endblock %}

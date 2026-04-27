@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Xem Tiêu Chí{% endblock %}
+
+{% block extra_css %}
+    <style>
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background: #fafafa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        td {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .col-amount {
+            text-align: right;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .filter-section {
+            margin-bottom: 15px;
+        }
+
+        .year-select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+            min-width: 150px;
+            cursor: pointer;
+        }
+
+        .year-select:focus {
+            border-color: #000;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <div>
+            <h1 style="font-size: 24px;">Xem Tiêu Chí</h1>
+        </div>
+    </header>
+
+    <div class="filter-section">
+        <form method="get">
+            <select name="year" class="year-select" onchange="this.form.submit()">
+                <option value="">T&#7845;t c&#7843; n&#259;m</option>
+                {% for year in available_years %}
+                    <option value="{{ year }}" {% if selected_year|stringformat:"s" == year|stringformat:"s" %}selected{% endif %}>
+                        N&#259;m {{ year }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 60px; text-align: center;">STT</th>
+                <th>Tên Tiêu Chí</th>
+                <th>Bắt đầu</th>
+                <th>Kết thúc</th>
+                <th>Năm</th>
+                <th class="text-right">Số tiền (Amount)</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for cat in all_categories %}
+                <tr>
+                    <td style="color: #999; text-align: center;">{{ forloop.counter }}</td>
+                    <td><strong>{{ cat.name }}</strong></td>
+                    <td>{{ cat.fromDate|date:"d/m/Y" }}</td>
+                    <td>{{ cat.toDate|date:"d/m/Y" }}</td>
+                    <td>{{ cat.year }}</td>
+                    <td class="col-amount text-right">
+                        <script>document.write(Number('{{ cat.amount }}').toLocaleString('vi-VN'));</script>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: #999; padding: 50px;">Chưa có dữ liệu nào.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
