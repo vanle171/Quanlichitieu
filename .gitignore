@@ -18,3 +18,7 @@ db.sqlite3
 
 # IDE
 .idea/
+
+# Archives and temp files
+*.zip
+*.tmp
