@@ -15,17 +15,54 @@ TOTAL_AMOUNT_ALLOCATED = "Tổng số tiền được cấp trong năm"
 AMOUNT_ALLOCATED_PERSON = "Số tiền được cấp trên người"
 
 
-def _get_fixed_category_amount(category_name):
-    category = Category.objects.filter(name=category_name).only('amount').first()
+def _get_fixed_category_amount(category_name, year=None):
+    categories = Category.objects.filter(name=category_name)
+    if year:
+        categories = categories.filter(year=year)
+    category = categories.only('amount').order_by('-year', '-id').first()
     if not category or category.amount is None:
         return 0
     return float(category.amount)
 
-def _get_fixed_category_amounts(category_name):
-    category = Category.objects.filter(name=category_name).only('amount').first()
+def _get_fixed_category_amounts(category_name, year=None):
+    categories = Category.objects.filter(name=category_name)
+    if year:
+        categories = categories.filter(year=year)
+    category = categories.only('amount').order_by('-year', '-id').first()
     if not category or category.amount is None:
         return 0
     return float(category.amount/10)
+
+
+def _redirect_after_event_save(to_date_value, active_route_name, past_route_name):
+    to_date_obj = datetime.strptime(to_date_value, '%Y-%m-%d').date()
+    if to_date_obj < date.today():
+        return redirect(past_route_name)
+    return redirect(active_route_name)
+
+
+def _calculate_event_total(event):
+    year = getattr(event, 'year', None)
+    total_users = int(getattr(event, 'totalUserAllocated', 0) or 0)
+    total = total_users * _get_fixed_category_amount(
+        AMOUNT_ALLOCATED_PERSON,
+        year=year,
+    )
+    extra_amount = 0
+    event_categories = EventCategory.objects.select_related('category').filter(event=event).exclude(
+        category__name__in=[TOTAL_AMOUNT_ALLOCATED, AMOUNT_ALLOCATED_PERSON]
+    )
+    for item in event_categories:
+        extra_amount += float(item.category.amount or 0) * int(item.quantity or 0)
+    return total + extra_amount
+
+
+def _refresh_event_total(event, persist=False):
+    total = _calculate_event_total(event)
+    event.totalAmount = total
+    if persist:
+        event.save(update_fields=['totalAmount'])
+    return total
 
 def admin_required(view_func):
     """Decorator để kiểm tra user có phải admin"""
@@ -285,10 +322,17 @@ def quan_ly_view(request):
 
                 EventCategory.objects.filter(event=event).delete()
                 total = 0
-                money_per_person = Category.objects.get(
+                try:
+                    money_per_person = Category.objects.get(
                     name="Số tiền được cấp trên người"
                 ).amount
-                total += int(totalUserAllocated) * float(money_per_person)
+                    total += int(totalUserAllocated) * float(money_per_person)
+                except Exception:
+                    pass
+                total = int(totalUserAllocated) * _get_fixed_category_amount(
+                    AMOUNT_ALLOCATED_PERSON,
+                    year=year,
+                )
                 for cat_id in danh_muc_ids:
                     category = Category.objects.get(id=cat_id)
                     EventCategory.objects.create(
@@ -300,10 +344,11 @@ def quan_ly_view(request):
                 event.totalAmount = total
                 event.save()
                 messages.success(request, "Lưu sự kiện thành công!")
-            to_date_obj = datetime.strptime(toDate, '%Y-%m-%d').date()
-            today = date.today()
-            
-            return redirect('quanLySuKien')
+            return _redirect_after_event_save(
+                toDate,
+                'quanLySuKien',
+                'quanLySuKienDaDienRa',
+            )
         else:
             messages.error(request, "Vui lòng điền đầy đủ thông tin.")
     all_categories = Category.objects.exclude(
@@ -381,8 +426,6 @@ def quan_ly_da_dien_ra_view(request):
             'is_parent': True,
             'children': list(parent.child_events.all().order_by('fromDate'))
         })
-        if parent.num_child_events >= 1:
-            parent.totalAmount = parent.totalAmount * parent.num_child_events
 
     context = {
         'all_categories': all_categories,
@@ -391,48 +434,37 @@ def quan_ly_da_dien_ra_view(request):
         'available_years': available_years,
         'selected_year': selected_year,
     }
-    return render(request, 'user_quanLySuKienDaDienRa.html', context)
+    return render(request, 'quanLySuKienDaDienRa.html', context)
 
 
 @login_required(login_url='/login/')
 @admin_required
 def thong_ke_su_kien_theo_nam_view(request):
     today = date.today()
-    planned_stats = list(
-        Event.objects.filter(
-            is_adhoc=False,
-            approval_status=EventApprovalStatus.APPROVED,
-            toDate__gte=today,
-            parent_event__isnull=True,
-        )
-        .exclude(year__isnull=True)
-        .values('year')
-        .annotate(total=Count('child_events'))
-        .order_by('year')
-    )
+    planned_stats = []
     planned_amount_stats = {}
-    planned_amount_events = list(
+    planned_events = (
         Event.objects.filter(
             is_adhoc=False,
             approval_status=EventApprovalStatus.APPROVED,
-            toDate__gte=today,
             parent_event__isnull=True,
         )
         .exclude(year__isnull=True)
-        .values('year', 'totalAmount')
         .annotate(total=Count('child_events'))
         .order_by('year')
     )
-    for item in planned_amount_events:
-        if not item['total']:
-            continue
-        planned_amount_stats[item['year']] = planned_amount_stats.get(item['year'], 0) + (item['totalAmount'] or 0) * item['total']
+    for event in planned_events:
+        total = event.total if event.total else 1
+        planned_stats.append({
+            'year': event.year,
+            'total': total,
+        })
+        planned_amount_stats[event.year] = planned_amount_stats.get(event.year, 0) + (event.totalAmount or 0) * total
 
     adhoc_stats = list(
         Event.objects.filter(
             is_adhoc=True,
             approval_status=EventApprovalStatus.APPROVED,
-            toDate__gte=today,
         )
         .exclude(year__isnull=True)
         .values('year')
@@ -443,7 +475,6 @@ def thong_ke_su_kien_theo_nam_view(request):
         Event.objects.filter(
             is_adhoc=True,
             approval_status=EventApprovalStatus.APPROVED,
-            toDate__gte=today,
         )
         .exclude(year__isnull=True)
         .values('year')
@@ -456,6 +487,28 @@ def thong_ke_su_kien_theo_nam_view(request):
         if not item['total']:
             continue
         stats_by_year[item['year']] = stats_by_year.get(item['year'], 0) + item['total']
+
+    # Năm 2026 có công thức riêng:
+    # tổng số sự kiện con của các kế hoạch + số sự kiện phát sinh đã duyệt.
+    planned_child_events_2026 = (
+        Event.objects.filter(
+            parent_event__isnull=False,
+            parent_event__is_adhoc=False,
+            parent_event__approval_status=EventApprovalStatus.APPROVED,
+            parent_event__year=2026,
+        )
+        .count()
+    )
+    approved_adhoc_events_2026 = (
+        Event.objects.filter(
+            is_adhoc=True,
+            approval_status=EventApprovalStatus.APPROVED,
+            year=2026,
+            toDate__gte=today,
+        )
+        .count()
+    )
+    stats_by_year[2026] = planned_child_events_2026 + approved_adhoc_events_2026
 
     yearly_stats = [
         {'year': year, 'total': total}
@@ -526,10 +579,17 @@ def quan_ly_su_kien_phat_sinh_view(request):
                 )
             EventCategory.objects.filter(event=event).delete()
             total = 0
-            money_per_person = Category.objects.get(
+            try:
+                money_per_person = Category.objects.get(
                 name="Số tiền được cấp trên người"
             ).amount
-            total += int(totalUserAllocated) * float(money_per_person)
+                total += int(totalUserAllocated) * float(money_per_person)
+            except Exception:
+                pass
+            total = int(totalUserAllocated) * _get_fixed_category_amount(
+                AMOUNT_ALLOCATED_PERSON,
+                year=year,
+            )
             for cat_id in danh_muc_ids:
                 category = Category.objects.get(id=cat_id)
                 EventCategory.objects.create(
@@ -541,7 +601,11 @@ def quan_ly_su_kien_phat_sinh_view(request):
             event.totalAmount = total
             event.save()
             messages.success(request, "Lưu sự kiện phát sinh thành công!")
-            return redirect('quanLySuKienPhatSinh')
+            return _redirect_after_event_save(
+                toDate,
+                'quanLySuKienPhatSinh',
+                'quanLySuKienDaDienRa',
+            )
         else:
             messages.error(request, "Vui lòng điền đầy đủ thông tin!")
     all_categories = Category.objects.all().exclude(
@@ -549,16 +613,6 @@ def quan_ly_su_kien_phat_sinh_view(request):
         Q(name=AMOUNT_ALLOCATED_PERSON)
     )
     today = date.today()
-    selected_year = request.GET.get('year', '')
-    available_years = Event.objects.filter(
-        is_adhoc=True,
-        approval_status__in=[
-            EventApprovalStatus.APPROVED,
-            EventApprovalStatus.REJECTED,
-            EventApprovalStatus.PENDING
-        ],
-        toDate__gte=today
-    ).exclude(year__isnull=True).order_by('-year').values_list('year', flat=True).distinct()
 
     events = Event.objects.filter(
         is_adhoc=True,
@@ -569,9 +623,6 @@ def quan_ly_su_kien_phat_sinh_view(request):
         ],
         toDate__gte=today
     )
-    if selected_year:
-        events = events.filter(year=selected_year)
-
     total_all_parents = 0
     for event in events:
         total_all_parents += event.totalAmount
@@ -580,8 +631,6 @@ def quan_ly_su_kien_phat_sinh_view(request):
     context = {
         'all_categories': all_categories,
         'events': events,
-        'available_years': available_years,
-        'selected_year': selected_year,
         'total_all_parents': total_all_parents,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED),
@@ -661,12 +710,11 @@ def get_categories(request):
     categories_list = list(categories)
 
     # Nếu là sự kiện phát sinh thì dùng hàm _get_fixed_category_amounts (có /10)
-    total_year = _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED) if is_adhoc else _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9
+    total_year = _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED, year=year) if is_adhoc else _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED, year=year)/10*9
 
     return JsonResponse({
         'categories': categories_list,
-        'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
-        'totalAmountYear': _get_fixed_category_amount(TOTAL_AMOUNT_ALLOCATED)/10*9,
+        'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON, year=year),
         'totalAmountYear': total_year,
     }, safe=False)
 
@@ -684,12 +732,11 @@ def get_categories_new(request):
     categories_list = list(categories)
 
     # Nếu là sự kiện phát sinh thì dùng hàm _get_fixed_category_amounts (có /10)
-    total_year = _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED) 
+    total_year = _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED, year=year) 
 
     return JsonResponse({
         'categories': categories_list,
-        'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
-        'totalAmountYear': _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED),
+        'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON, year=year),
         'totalAmountYear': total_year,
     }, safe=False)
 
@@ -743,10 +790,17 @@ def quan_ly_danh_muc_view(request):
         else:
             messages.error(request, "Vui lòng nhập đầy đủ: Tên, Số tiền và cả hai Ngày.")
 
-    all_categories = Category.objects.all().order_by('-id')
+    selected_year = request.GET.get('year', '')
+    all_categories = Category.objects.all()
+    if selected_year:
+        all_categories = all_categories.filter(year=selected_year)
+    all_categories = all_categories.order_by('-id')
+    available_years = Category.objects.exclude(year__isnull=True).order_by('-year').values_list('year', flat=True).distinct()
 
     return render(request, 'danhMuc.html', {
         'all_categories': all_categories,
+        'available_years': available_years,
+        'selected_year': selected_year,
     })
 
 
@@ -803,8 +857,6 @@ def user_quan_ly_view(request):
             'is_parent': True,
             'children': list(parent.child_events.all().order_by('fromDate'))
         })
-        if parent.num_child_events >= 1:
-            parent.totalAmount = parent.totalAmount * parent.num_child_events
         total_all_parents += parent.totalAmount
 
     context = {
@@ -883,22 +935,11 @@ def user_quan_ly_da_dien_ra_view(request):
 def user_quan_ly_su_kien_phat_sinh_view(request):
     """User view for quanLySuKienPhatSinh - read-only"""
     today = date.today()
-    selected_year = request.GET.get('year', '')
 
     all_categories = Category.objects.all().exclude(
         Q(name=TOTAL_AMOUNT_ALLOCATED) |
         Q(name=AMOUNT_ALLOCATED_PERSON)
     )
-
-    available_years = Event.objects.filter(
-        is_adhoc=True,
-        approval_status__in=[
-            EventApprovalStatus.APPROVED,
-            EventApprovalStatus.REJECTED,
-            EventApprovalStatus.PENDING
-        ],
-        toDate__gte=today
-    ).exclude(year__isnull=True).order_by('-year').values_list('year', flat=True).distinct()
 
     # Lọc các sự kiện phát sinh đã duyệt
     events = Event.objects.filter(
@@ -910,8 +951,6 @@ def user_quan_ly_su_kien_phat_sinh_view(request):
         ],
         toDate__gte=today
     )
-    if selected_year:
-        events = events.filter(year=selected_year)
     total_all_parents = 0
     for event in events:
         total_all_parents += event.totalAmount
@@ -921,8 +960,6 @@ def user_quan_ly_su_kien_phat_sinh_view(request):
     context = {
         'events': events,
         'all_categories': all_categories,
-        'available_years': available_years,
-        'selected_year': selected_year,
         'total_all_parents': total_all_parents,
         'per_user_amount': _get_fixed_category_amount(AMOUNT_ALLOCATED_PERSON),
         'totalAmountYear': _get_fixed_category_amounts(TOTAL_AMOUNT_ALLOCATED),
@@ -934,8 +971,15 @@ def user_quan_ly_su_kien_phat_sinh_view(request):
 @login_required(login_url='/login/')
 def user_quan_ly_danh_muc_view(request):
     """User view for quanLyDanhMuc - read-only"""
-    all_categories = Category.objects.all().order_by('-id')
+    selected_year = request.GET.get('year', '')
+    all_categories = Category.objects.all()
+    if selected_year:
+        all_categories = all_categories.filter(year=selected_year)
+    all_categories = all_categories.order_by('-id')
+    available_years = Category.objects.exclude(year__isnull=True).order_by('-year').values_list('year', flat=True).distinct()
 
     return render(request, 'user_danhMuc.html', {
         'all_categories': all_categories,
+        'available_years': available_years,
+        'selected_year': selected_year,
     })

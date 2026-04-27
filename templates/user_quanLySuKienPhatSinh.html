@@ -88,47 +88,6 @@
             white-space: nowrap;
         }
 
-        .filter-bar {
-            display: flex;
-            align-items: flex-end;
-            gap: 12px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .filter-group label {
-            color: #666;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .filter-group select {
-            min-width: 180px;
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background: #fff;
-            font-size: 14px;
-        }
-
-        .clear-filter {
-            border-radius: 6px;
-            padding: 10px 16px;
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-            line-height: 20px;
-            background: #f3f4f6;
-            color: #374151;
-            border: 1px solid #e5e7eb;
-        }
-
     </style>
 {% endblock %}
 
@@ -136,21 +95,6 @@
     <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; width: 100%;">
         <h1>Xem sự kiện phát sinh</h1>
     </header>
-
-    <form method="get" class="filter-bar">
-        <div class="filter-group">
-            <label for="year">Năm</label>
-            <select id="year" name="year" onchange="this.form.submit()">
-                <option value="">Tất cả các năm</option>
-                {% for year in available_years %}
-                    <option value="{{ year }}" {% if year|stringformat:"s" == selected_year %}selected{% endif %}>{{ year }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% if selected_year %}
-            <a href="{{ request.path }}" class="clear-filter">Bỏ lọc</a>
-        {% endif %}
-    </form>
 
     <div class="table-container">
         <table>

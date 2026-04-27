@@ -42,6 +42,24 @@
         .text-right {
             text-align: right;
         }
+
+        .filter-section {
+            margin-bottom: 15px;
+        }
+
+        .year-select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+            min-width: 150px;
+            cursor: pointer;
+        }
+
+        .year-select:focus {
+            border-color: #000;
+        }
     </style>
 {% endblock %}
 
@@ -51,6 +69,19 @@
             <h1 style="font-size: 24px;">Xem Tiêu Chí</h1>
         </div>
     </header>
+
+    <div class="filter-section">
+        <form method="get">
+            <select name="year" class="year-select" onchange="this.form.submit()">
+                <option value="">T&#7845;t c&#7843; n&#259;m</option>
+                {% for year in available_years %}
+                    <option value="{{ year }}" {% if selected_year|stringformat:"s" == year|stringformat:"s" %}selected{% endif %}>
+                        N&#259;m {{ year }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
 
     <div class="table-container">
         <table>

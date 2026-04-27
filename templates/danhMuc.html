@@ -157,6 +157,19 @@
         <button class="btn btn-add" onclick="openAddModal()">+ Thêm Tiêu Chí</button>
     </header>
 
+    <div class="filter-section">
+        <form method="get">
+            <select name="year" class="year-select" onchange="this.form.submit()">
+                <option value="">T&#7845;t c&#7843; n&#259;m</option>
+                {% for year in available_years %}
+                    <option value="{{ year }}" {% if selected_year|stringformat:"s" == year|stringformat:"s" %}selected{% endif %}>
+                        N&#259;m {{ year }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
     <div class="table-container">
         <table>
             <thead>
