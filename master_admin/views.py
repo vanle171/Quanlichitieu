@@ -525,6 +525,33 @@ def thong_ke_su_kien_theo_nam_view(request):
     for item in adhoc_amount_stats:
         amounts_by_year[item['year']] = amounts_by_year.get(item['year'], 0) + (item['total_amount'] or 0)
 
+    # Năm 2026 có công thức riêng cho tổng tiền chi:
+    # tổng tiền của các sự kiện con thuộc kế hoạch đã duyệt năm 2026
+    # + tổng tiền của các sự kiện phát sinh đã duyệt năm 2026.
+    planned_child_amount_2026 = (
+        Event.objects.filter(
+            parent_event__isnull=False,
+            parent_event__is_adhoc=False,
+            parent_event__approval_status=EventApprovalStatus.APPROVED,
+            parent_event__year=2026,
+        )
+        .aggregate(total_amount=Sum('totalAmount'))
+        .get('total_amount')
+        or 0
+    )
+    approved_adhoc_amount_2026 = (
+        Event.objects.filter(
+            is_adhoc=True,
+            approval_status=EventApprovalStatus.APPROVED,
+            year=2026,
+            toDate__gte=today,
+        )
+        .aggregate(total_amount=Sum('totalAmount'))
+        .get('total_amount')
+        or 0
+    )
+    amounts_by_year[2026] = planned_child_amount_2026 + approved_adhoc_amount_2026
+
     yearly_amount_stats = [
         {'year': year, 'total_amount': total_amount}
         for year, total_amount in sorted(amounts_by_year.items())
